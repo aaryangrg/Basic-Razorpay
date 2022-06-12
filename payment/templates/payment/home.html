@@ -1,0 +1,74 @@
+{% extends 'payment/base.html'%} {%block content%}
+<div
+  style="
+    padding: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    border-radius: 20px;
+    width: 60%;
+    position: absolute;
+    top: 50%;
+    right: 50%;
+    transform: translate(50%);
+    box-shadow: rgba(0, 0, 0, 0.12) 0px 1px 3px, rgba(0, 0, 0, 0.24) 0px 1px 2px;
+  "
+>
+  <h3
+    style="
+      text-align: center;
+      padding-bottom: 20px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+    "
+  >
+    Donate to help us fight COVID
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      fill="currentColor"
+      class="bi bi-bank"
+      viewBox="0 0 16 16"
+      style="margin-left: 10px"
+    >
+      <path
+        d="m8 0 6.61 3h.89a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5H15v7a.5.5 0 0 1 .485.38l.5 2a.498.498 0 0 1-.485.62H.5a.498.498 0 0 1-.485-.62l.5-2A.501.501 0 0 1 1 13V6H.5a.5.5 0 0 1-.5-.5v-2A.5.5 0 0 1 .5 3h.89L8 0ZM3.777 3h8.447L8 1 3.777 3ZM2 6v7h1V6H2Zm2 0v7h2.5V6H4Zm3.5 0v7h1V6h-1Zm2 0v7H12V6H9.5ZM13 6v7h1V6h-1Zm2-1V4H1v1h14Zm-.39 9H1.39l-.25 1h13.72l-.25-1Z"
+      />
+    </svg>
+  </h3>
+  <h4 style="text-align: center; padding-bottom: 20px">
+    ₹{%widthratio order.amount 100 1%}
+  </h4>
+  <button
+    class="btn btn-outline-primary"
+    id="fund-me-btn"
+    style="width: auto; margin: auto"
+  >
+    Donate
+  </button>
+</div>
+<!-- Razorpay's Javascript -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  var options = {
+    key: "{{merchant_key }}",
+    amount: "{{order.amount}}",
+    currency: "{{order.currency}}",
+    name: "Fund Me",
+    order_id: "{{ order.id }}",
+    callback_url: "{{callback}}",
+  };
+
+  // initialise razorpay with the options.
+  var razor_pay = new Razorpay(options);
+
+  // add event listener to the payment button.
+  document.getElementById("fund-me-btn").onclick = function (e) {
+    razor_pay.open();
+    e.preventDefault();
+  };
+</script>
+{%endblock%}
