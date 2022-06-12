@@ -12,6 +12,7 @@ from django.contrib.auth.models import User
 import json
 from datetime import datetime
 from django.contrib.auth.decorators import login_required
+from django.utils.timezone import now
 
 # Create RazorPay Client with our keys
 razorpay_client = razorpay.Client(
@@ -42,12 +43,12 @@ def home(request):
 
 @ csrf_exempt
 def handle_payment(request):
-    #   Consider a status field in the Orders Model -> Updated in this function
     if request.method == "POST":
         try:
             payment_id = request.POST.get('razorpay_payment_id')
             order_id = request.POST.get('razorpay_order_id')
             signature = request.POST.get('razorpay_signature')
+            # Don't need to capture payment (config is on auto)
             result = razorpay_client.utility.verify_payment_signature(
                 {'razorpay_payment_id': payment_id,
                  'razorpay_order_id': order_id,
@@ -56,7 +57,12 @@ def handle_payment(request):
                 # if payment is verified
                 try:
                     order = Order.objects.filter(order_id=order_id).first()
+                    payment_details = razorpay_client.payment.fetch(payment_id)
+                    if payment_details["captured"]:
+                        order.payment_status = "Success"
                     order.payment_id = payment_id
+                    # Our copy of having received the payment --> not razorpay time
+                    order.paid_at = datetime.now()
                     order.save()
                     return render(request, 'payment/payment_succeeded.html')
                 except:
@@ -72,51 +78,43 @@ def handle_payment(request):
             order_id, payment_id = id_dict["order_id"], id_dict["payment_id"]
             created_order = Order.objects.filter(order_id=order_id).first()
             created_order.payment_id = payment_id
+            # Update Order payment_status
+            if("error[reason]" in failure_details.keys()):
+                payment_error_reason = failure_details["error[reason]"][0]
+                if payment_error_reason.find("cancelled") >= 0:
+                    created_order.payment_status = "Cancelled"
+                elif payment_error_reason.find("failed") >= 0:
+                    created_order.payment_status = "Declined"
+                else:
+                    created_order.payment_status = "Failed"
+            else:
+                created_order.payment_status = "Failed"
+            created_order.paid_at = datetime.now()
             created_order.save()
-            return render(request, 'payment/failed_payment.html')
+            return render(request, 'payment/failed_payment.html', {"reason": payment_error_reason})
     else:
         return HttpResponseBadRequest
 
 
 @login_required(login_url='/accounts/login')
-# If we add a status to Order -> Faster render on endpoint hit (no need to re-query)
 def donations(request):
     past_transactions = []
+    # Using related names to get orders of a user
     for order in request.user.user_orders.all():
-        transaction = dict()
         # Payment is attemtped -> else empty order
+        # Payment details in Order model prevent re-query
         if order.payment_id != None:
-            payment_details = razorpay_client.payment.fetch(order.payment_id)
-            transaction["id"] = payment_details["id"]
-            transaction["amount"] = payment_details["amount"]
-            transaction["method"] = payment_details["method"]
-            transaction["date"] = datetime.fromtimestamp(
-                int(payment_details["created_at"]))
-            if payment_details["captured"]:
-                transaction["status"] = "Success"
+            transaction = dict()
+            transaction["id"] = order.payment_id
+            transaction["amount"] = DONATION_AMOUNT
+            transaction["date"] = order.paid_at
+            transaction["status"] = order.payment_status
+            # Dynamic styling
+            if order.payment_status == "Success":
                 transaction["display_color"] = "success"
+            elif order.payment_status == "Pending":
+                transaction["display_color"] = "pending"
             else:
-                if payment_details["error_reason"] and payment_details["error_reason"].find("cancelled") >= 0:
-                    transaction["status"] = "Cancelled"
-                    transaction["display_color"] = "failure"
-                elif payment_details["error_reason"] and payment_details["error_reason"].find("failed") >= 0:
-                    transaction["status"] = "Declined"
-                    transaction["display_color"] = "failure"
-                else:
-                    transaction["status"] = "Failed"
-                    transaction["display_color"] = "failure"
-        else:
-            # Making unpaid orders = Pending (not exactly true)
-            #     original_order = razorpay_client.order.fetch(order.order_id)
-            #     transaction["id"] = original_order["id"]
-            #     transaction["amount"] = original_order["amount"]
-            #     transaction["status"] = "Pending"
-            #     transaction["method"] = "NA"
-            #     transaction["date"] = datetime.fromtimestamp(
-            #         int(original_order["created_at"]))
-            #     transaction["display_color"] = "pending"
-            # past_transactions.append(transaction)
-            pass
-        if(transaction):
+                transaction["display_color"] = "failure"
             past_transactions.append(transaction)
     return render(request, 'payment/past_donations.html', context={"transactions": past_transactions})

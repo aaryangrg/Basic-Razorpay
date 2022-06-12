@@ -1,4 +1,5 @@
 {%extends 'payment/base.html'%} {%block content%}
 <h1 style="text-align: center">Your donation was unsuccessful</h1>
 <a class="btn btn-outline-warning" href="{%url 'home'%}"> Try again?</a>
+<p>{{reason}}</p>
 {%endblock%}

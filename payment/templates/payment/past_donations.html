@@ -35,15 +35,14 @@
     <th>Payment ID</th>
     <th>Amount</th>
     <th>Status</th>
-    <th>Method</th>
     <th>Date</th>
   </tr>
   {%for transaction in transactions%}
   <tr>
     <td>{{transaction.id}}</td>
+    <!-- (a/b)*c -->
     <td>₹{% widthratio transaction.amount 100 1%}</td>
     <td class="{{transaction.display_color}}">{{transaction.status}}</td>
-    <td>{{transaction.method}}</td>
     <td>{{transaction.date}}</td>
   </tr>
   {%endfor%}
